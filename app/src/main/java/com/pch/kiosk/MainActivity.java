@@ -2,12 +2,14 @@ package com.pch.kiosk;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -88,6 +90,41 @@ public class MainActivity extends Activity {
         });
 
         webView.setWebChromeClient(new WebChromeClient());
+
+        // JavaScript bridge — lets the web app launch native Fire TV apps
+        webView.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public boolean launchApp(String packageName) {
+                try {
+                    PackageManager pm = getPackageManager();
+                    Intent launch = pm.getLaunchIntentForPackage(packageName);
+                    if (launch != null) {
+                        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(launch);
+                        return true;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                return false;
+            }
+
+            @JavascriptInterface
+            public boolean isInstalled(String packageName) {
+                try {
+                    getPackageManager().getPackageInfo(packageName, 0);
+                    return true;
+                } catch (PackageManager.NameNotFoundException e) {
+                    return false;
+                }
+            }
+
+            @JavascriptInterface
+            public boolean isKiosk() {
+                return true;
+            }
+        }, "PCHKiosk");
+
         webView.loadUrl(KIOSK_URL);
     }
 
