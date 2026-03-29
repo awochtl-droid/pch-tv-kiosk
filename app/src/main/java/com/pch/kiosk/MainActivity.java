@@ -38,6 +38,14 @@ public class MainActivity extends Activity {
         // Keep screen on
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        // Start the kiosk watchdog service
+        Intent svc = new Intent(this, KioskService.class);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(svc);
+        } else {
+            startService(svc);
+        }
+
         // Create WebView
         webView = new WebView(this);
         setContentView(webView);
@@ -125,6 +133,7 @@ public class MainActivity extends Activity {
             if (menuTapCount >= EXIT_TAP_COUNT) {
                 menuTapCount = 0;
                 kioskEnabled = false;
+                stopService(new Intent(this, KioskService.class));
                 finish();
             }
             return true;
