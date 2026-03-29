@@ -1,8 +1,10 @@
 package com.pch.kiosk;
 
 import android.app.Activity;
-import android.os.Build;
+import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -23,6 +25,8 @@ public class MainActivity extends Activity {
     private WebView webView;
     private int menuTapCount = 0;
     private long firstMenuTapTime = 0;
+    private boolean kioskEnabled = true;
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,16 +58,14 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                // Block navigation to anything outside our domain
                 if (url.startsWith(KIOSK_URL) || url.contains("pch-tv")) {
-                    return false; // allow
+                    return false;
                 }
-                return true; // block
+                return true;
             }
 
             @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                // Show a simple offline message, retry after 10s
                 view.loadData(
                     "<html><body style='background:#120D0A;color:#F5EDE4;font-family:sans-serif;" +
                     "display:flex;align-items:center;justify-content:center;height:100vh;margin:0'>" +
@@ -78,12 +80,10 @@ public class MainActivity extends Activity {
         });
 
         webView.setWebChromeClient(new WebChromeClient());
-
-        // Load the app
         webView.loadUrl(KIOSK_URL);
     }
 
-    // ── Immersive sticky mode — hides nav/status bars ──
+    // ── Immersive sticky mode ──
 
     private void goImmersive() {
         getWindow().getDecorView().setSystemUiVisibility(
@@ -102,11 +102,10 @@ public class MainActivity extends Activity {
         if (hasFocus) goImmersive();
     }
 
-    // ── Block all remote keys except the staff exit combo ──
+    // ── Block remote keys ──
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // Allow D-pad and Enter for navigating the web app
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP
             || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
             || keyCode == KeyEvent.KEYCODE_DPAD_LEFT
@@ -116,7 +115,6 @@ public class MainActivity extends Activity {
             return super.onKeyDown(keyCode, event);
         }
 
-        // MENU key combo: press 5 times within 3 seconds to exit kiosk
         if (keyCode == KeyEvent.KEYCODE_MENU) {
             long now = System.currentTimeMillis();
             if (now - firstMenuTapTime > EXIT_TAP_WINDOW_MS) {
@@ -126,38 +124,51 @@ public class MainActivity extends Activity {
             menuTapCount++;
             if (menuTapCount >= EXIT_TAP_COUNT) {
                 menuTapCount = 0;
-                finish(); // exit kiosk
+                kioskEnabled = false;
+                finish();
             }
             return true;
         }
 
-        // Block HOME, BACK, and everything else
-        if (keyCode == KeyEvent.KEYCODE_HOME
-            || keyCode == KeyEvent.KEYCODE_BACK
-            || keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
-            return true; // consume — do nothing
-        }
-
-        return true; // block all other keys
+        return true; // block everything else
     }
 
     @Override
     public void onBackPressed() {
-        // Block back button entirely
+        // blocked
     }
 
-    // ── Lifecycle — re-lock on resume ──
+    // ── Auto-relaunch: when the app loses focus, bring it right back ──
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (kioskEnabled) {
+            // Relaunch after a short delay — gives Android time to finish the HOME transition
+            handler.postDelayed(this::bringBack, 200);
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (kioskEnabled) {
+            handler.postDelayed(this::bringBack, 200);
+        }
+    }
+
+    private void bringBack() {
+        if (!kioskEnabled) return;
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+            | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+    }
 
     @Override
     protected void onResume() {
         super.onResume();
         goImmersive();
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        // If app somehow loses focus, bring it back
-        // (Fire TV doesn't have a great API for this, but the HOME intent-filter helps)
     }
 }
