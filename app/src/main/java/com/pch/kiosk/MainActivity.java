@@ -18,7 +18,7 @@ import android.webkit.WebViewClient;
 public class MainActivity extends Activity {
 
     // ── CHANGE THIS to your Vercel URL ──
-    private static final String KIOSK_URL = "https://pch-tv.vercel.app";
+    private static final String KIOSK_URL = "https://pch-tv.vercel.app?room=101";
 
     // Staff exit combo: press MENU 5 times quickly to exit kiosk
     private static final int EXIT_TAP_COUNT = 5;
